@@ -16,10 +16,9 @@
 Command used:
 ```bash
 nmap -sC -sV -oN scan.txt <target-ip>
-```
-result:
+```result:
 
-# Nmap 7.95 scan initiated Sun Dec 14 02:41:59 2025 as: /usr/lib/nmap/nmap --privileged -sC -sV -oN scan.txt <machine-ip>
+Nmap 7.95 scan initiated Sun Dec 14 02:41:59 2025 as: /usr/lib/nmap/nmap --privileged -sC -sV -oN scan.txt <machine-ip>
 Nmap scan report for <machine-ip>
 Host is up (0.17s latency).
 Not shown: 998 closed tcp ports (reset)
@@ -46,8 +45,8 @@ PORT     STATE SERVICE  VERSION
 |_http-server-header: SimpleHTTP/0.6 Python/3.11.2
 Key findings:
 ```
-22/tcp   open  ssh      OpenSSH 8.2p1 Ubuntu
-8000/tcp open  http     SimpleHTTP/0.6 Python/3.11.2
+    22/tcp   open  ssh      OpenSSH 8.2p1 Ubuntu
+    8000/tcp open  http     SimpleHTTP/0.6 Python/3.11.2
 ```
 
 ### 🧠 Analysis
@@ -214,9 +213,8 @@ if __name__ == "__main__":
     bruteforce(ip, port, wordlist)
 
 ```
-ba5ed03e9e74bb98054438480165e221
+    ba5ed03e9e74bb98054438480165e221
 ```
----
 ```
 ## 🏆 Flags Summary
 
