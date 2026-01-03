@@ -1,4 +1,4 @@
-# CloudSite – TryHackMe Write-Up
+# Rabbitstore – TryHackMe Write-Up
 
 **Target:** storage.cloudsite.thm  
 **Category:** Web / API / Privilege Escalation  
