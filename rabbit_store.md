@@ -1,143 +1,141 @@
-CloudSite — TryHackMe Style Write-Up
+# CloudSite – TryHackMe Write-Up
 
-Room Type: Web / API / Privilege Escalation
-Target: storage.cloudsite.thm
-Difficulty: Medium
-Status: Completed
+**Target:** storage.cloudsite.thm  
+**Category:** Web / API / Privilege Escalation  
+**Difficulty:** Medium  
+**Environment:** Authorized TryHackMe Lab
 
-Enumeration
+---
 
-Initial reconnaissance revealed a JavaScript-heavy web application. Client-side source inspection exposed several internal API endpoints:
+## Enumeration
 
-/api/upload
-/api/store-url
-/api/uploads
-/api/logout
+Initial analysis of the web application revealed several API endpoints exposed through client-side JavaScript:
 
+/api/upload  
+/api/store-url  
+/api/uploads  
+/api/logout  
 
-These endpoints suggested authenticated functionality related to file handling and user sessions.
+These endpoints suggested authenticated functionality related to file handling and session management.
 
-Authentication Analysis
+---
 
-The application relied on token-based authentication. Multiple token delivery mechanisms were accepted by the backend:
+## Authentication & Token Handling
 
-Authorization header
+The application relied on token-based authentication and accepted tokens through multiple mechanisms:
 
-Cookies
+- Authorization header (Bearer token)  
+- Cookies  
+- Custom authentication headers  
 
-Custom authentication headers
+Token validation was improperly implemented. While invalid tokens were sometimes rejected, the backend failed to strictly validate token claims, opening the door to logical abuse.
 
-Despite this, token validation was weak. Invalid or manipulated tokens were rejected inconsistently, indicating improper verification of token integrity and claims.
+---
 
-Logic Flaw: Subscription Manipulation
+## Logic Flaw: Subscription Manipulation
 
-While reviewing the registration workflow, a critical logic flaw was identified.
+A critical logic flaw was identified in the user registration process.
 
-Vulnerable Endpoint
-POST /api/register
+**Vulnerable Endpoint:**  
+POST /api/register  
 
-Issue
+The backend trusted user-supplied fields such as:
 
-User-controlled fields such as:
+- subscription status  
+- token-related claims (iat, exp)  
 
-subscription
+By modifying the registration request, it was possible to register an account with an active subscription state, bypassing intended access controls.
 
-token claim values (iat, exp)
+**Impact:**  
+Restricted functionality, including file uploads, became available to a standard user.
 
-were trusted directly by the backend.
+---
 
-Impact
+## Authenticated Access & File Uploads
 
-By registering with a modified request, a normal user could obtain an active subscription state, unlocking restricted functionality without proper authorization checks.
+After authentication with the manipulated subscription status:
 
-Authenticated Functionality Access
+- Upload functionality was accessible  
+- Uploaded files could be retrieved via predictable API paths  
 
-Once authenticated with elevated privileges:
+This confirmed that authorization was enforced solely through the flawed subscription logic.
 
-File upload functionality became available
+---
 
-Uploaded files were accessible through predictable API paths
+## SSRF via URL Upload Feature
 
-This confirmed that subscription status directly controlled access to sensitive features.
+The application included a feature that allowed users to upload files via remote URLs. This feature failed to restrict access to internal network resources.
 
-SSRF via URL Upload Feature
+### Findings
+- Requests to localhost were permitted  
+- An internal service was discovered running on port 3000  
 
-The application provided a URL-based upload mechanism. This functionality failed to restrict internal network access.
+This indicated a Server-Side Request Forgery (SSRF) vulnerability.
 
-Result
+---
 
-Internal services on localhost were reachable
+## Internal API Disclosure
 
-Port enumeration identified an internal service running on port 3000
+Using SSRF, an internal API documentation endpoint was accessed on the local service. This documentation revealed additional internal routes, including a chatbot API that was never intended to be exposed externally.
 
-Internal Service Disclosure
+---
 
-Accessing the internal service revealed an API documentation endpoint. This endpoint exposed additional internal routes, including a chatbot service not intended to be user-accessible.
-
-This represented a classic case of internal API exposure via SSRF.
-
-Remote Code Execution (User Access)
+## Remote Code Execution (User Shell)
 
 The chatbot endpoint:
 
-Accepted JSON input
+- Accepted JSON input  
+- Was implemented using Flask  
+- Passed user input unsafely to backend logic  
 
-Was built using the Flask framework
+Due to insufficient input sanitization, the endpoint was vulnerable to server-side code execution. Exploiting this resulted in a reverse shell connection and **user-level access**.
 
-Passed user input unsafely to backend logic
-
-Due to insufficient input sanitization, this endpoint was vulnerable to server-side code execution. Exploiting this resulted in a reverse connection to the attacker, providing user-level shell access.
-
-Flag Obtained
-
+**Flag Obtained:**  
 user.txt
 
-Privilege Escalation
-RabbitMQ Enumeration
+---
 
-Post-exploitation enumeration revealed a RabbitMQ installation. A sensitive Erlang cookie was found stored with weak file permissions:
+## Privilege Escalation
 
-/var/lib/rabbitmq/.erlang.cookie
+### RabbitMQ Misconfiguration
 
-Finding
+Post-exploitation enumeration revealed a RabbitMQ installation. A sensitive Erlang cookie was found stored with weak permissions:
 
-The Erlang cookie allows authenticated interaction with the RabbitMQ node. Possession of this cookie effectively grants administrative-level access to the message broker service.
+/var/lib/rabbitmq/.erlang.cookie  
 
-Impact
+This cookie is used to authenticate Erlang nodes and RabbitMQ administrative actions.
 
-Abusing this misconfiguration enabled privilege escalation from the user account to a higher-privileged context, completing the room.
+### Impact
 
-Attack Chain Summary
+Possession of the Erlang cookie allowed authenticated interaction with the RabbitMQ service, leading to privilege escalation and full system compromise.
 
-Client-side API discovery
+---
 
-Authentication and logic flaw abuse
+## Attack Chain Summary
 
-Unauthorized subscription activation
+1. Client-side API enumeration  
+2. Authentication weakness identification  
+3. Subscription logic manipulation  
+4. Unauthorized access to upload functionality  
+5. SSRF via URL upload feature  
+6. Internal API documentation exposure  
+7. Code execution through chatbot endpoint  
+8. User shell access  
+9. Privilege escalation via Erlang cookie  
 
-SSRF through URL upload feature
+---
 
-Internal API documentation exposure
+## Lessons Learned
 
-Command execution via chatbot endpoint
+- Client-side code should not expose sensitive API endpoints  
+- Token claims must always be validated server-side  
+- Authorization logic should never rely on user-controlled fields  
+- Internal services must be isolated from user input  
+- Service credentials such as Erlang cookies must be strictly protected  
 
-User shell access
+---
 
-Privilege escalation via Erlang cookie misuse
+## Disclaimer
 
-Lessons Learned
-
-Client-side code should never expose sensitive API logic
-
-Token claims must be validated server-side
-
-Internal services should not be reachable from user input
-
-Sensitive service credentials (Erlang cookies) must be strictly protected
-
-Defense-in-depth is critical for API-driven applications
-
-Disclaimer
-
-This write-up documents exploitation performed only in an authorized TryHackMe lab environment.
-All techniques are presented for educational purposes and must not be used against systems without explicit permission.
+This write-up documents exploitation performed **only in an authorized TryHackMe lab environment**.  
+All information is provided strictly for educational purposes.
